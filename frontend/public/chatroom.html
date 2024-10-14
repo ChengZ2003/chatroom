@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聊天室</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex; /* Make the layout flexible for sidebar */
+        }
+        .container {
+            max-width: 85%;
+            margin: auto;
+            background-color: white;
+            padding: 20px;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 12px rgba(0, 0, 0, 0.1);
+            flex: 1; /* Allow container to fill space */
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+        }
+        .input-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+        }
+        .input-section textarea {
+            width: 60%;
+            padding: 10px;
+            resize: none;
+        }
+        .input-section button {
+            width: 15%;
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .input-section button:hover {
+            background-color: #218838;
+        }
+        /* Sidebar style */
+        .sidebar {
+            width: 200px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 20px;
+            box-shadow: 2px 2px 12px rgba(0, 0, 0, 0.1);
+            margin-right: 20px;
+        }
+        .sidebar h3 {
+            margin-top: 0;
+        }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+        .sidebar ul li {
+            padding: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h3>在线用户</h3>
+        <ul id="user-list">
+            <!-- 用户列表将在这里显示 -->
+        </ul>
+    </div>
+    <div class="container">
+        <div class="header">
+            <h1>王者聊天室———<span id="room-name"></span>房间</h1>
+            <p>欢迎回来: <span id="username"></span></p>
+            <p style="display: none;">时间: <span id="time"></span></p>
+        </div>
+        <div class="messages" id="chat-messages">
+            <!-- 聊天记录将在这里显示 -->
+        </div>
+        <div class="input-section">
+            <textarea id="message-input" rows="3" placeholder="请输入聊天内容"></textarea>
+            <button id="send-button">发送消息</button>
+            <div id="color-picker">
+                <span class="color-label">定义聊天文字的颜色：</span> <!-- 添加提示文本 -->
+                <input type="color" id="color-input">
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        // 从 URL 中获取用户名和房间信息
+        const urlParams = new URLSearchParams(window.location.search);
+        const username = urlParams.get('username');
+        const room = urlParams.get('room');
+
+        document.getElementById('username').textContent = username;
+        document.getElementById('time').textContent = formatDateTime(new Date());
+        document.getElementById('room-name').textContent = room;
+
+        // 创建 Socket 连接
+        const socket = io(`http://localhost:3000`);
+
+        // 初始化聊天记录区域
+        const chatMessages = document.getElementById('chat-messages');
+        const userList = document.getElementById('user-list');
+
+        let hasLoadedMessages = false;
+
+        // 加入聊天室并请求历史消息和用户列表
+        socket.emit('joinRoom', { username, room });
+
+        // 监听历史消息加载
+        socket.on('loadMessages', (messages) => {
+            messages.forEach(msg => {
+                const messageTime = formatDateTime(new Date(msg.timestamp)); // 使用历史消息的 timestamp 字段
+                appendMessage(msg.username, msg.message, msg.color, messageTime);
+            });
+            chatMessages.scrollTop = chatMessages.scrollHeight; // 滚动到底部
+            hasLoadedMessages = true; // 标记历史消息加载完成
+        });
+
+        // 监听新消息
+        socket.on('receiveMessage', ({ username, message, color }) => {
+            const messageTime = formatDateTime(new Date()); // 获取当前时间
+            appendMessage(username, message, color, messageTime);
+            chatMessages.scrollTop = chatMessages.scrollHeight; // 自动滚动到底部
+        });
+
+        // 监听新用户加入消息（延迟发送，确保历史消息加载完后再处理）
+        socket.on('newUserJoin', ({ username }) => {
+            if (hasLoadedMessages) {
+                const systemMessage = `${formatDateTime(new Date())} 服务器 说：${username} 加入了聊天室。😊`;
+                appendSystemMessage(systemMessage);
+                scrollToBottom();
+            }
+        });
+
+        // 监听欢迎消息（只发送给新用户）
+        socket.on('welcome', ({ username }) => {
+            if (hasLoadedMessages) {
+                const welcomeMessage = `${formatDateTime(new Date())} 服务器 说：欢迎 ${username} 加入聊天室！😊`;
+                appendSystemMessage(welcomeMessage);
+                scrollToBottom();
+            }
+        });
+
+        // 监听在线用户更新
+        socket.on('updateUserList', (users) => {
+            userList.innerHTML = ''; // 清空当前用户列表
+            users.forEach(user => {
+                const userElement = document.createElement('li');
+                userElement.textContent = user;
+                userList.appendChild(userElement);
+            });
+        });
+
+        // 监听用户离开房间的系统消息
+        socket.on('userLeft', ({ username, room }) => {
+            const systemMessage = `${formatDateTime(new Date())} 服务器 说：${username} 已经离开聊天室。😊`;
+            appendSystemMessage(systemMessage);
+            scrollToBottom();
+        });
+
+        // 发送消息
+        document.getElementById('send-button').addEventListener('click', function() {
+            const messageInput = document.getElementById('message-input');
+            const messageText = messageInput.value.trim();
+            if (messageText !== '') {
+                const color = document.getElementById('color-input').value || '#000';
+                socket.emit('sendMessage', { username, message: messageText, color, room });
+                messageInput.value = '';
+            }
+        });
+
+        // 辅助函数：创建消息元素并显示
+        function appendMessage(username, message, color, time) {
+            const messageElement = document.createElement('p');
+            messageElement.style.color = color || '#000';
+            messageElement.innerHTML = `${time} ${username} 说：${message}`;
+            chatMessages.appendChild(messageElement);
+        }
+
+        // 辅助函数：创建系统消息元素并显示
+        function appendSystemMessage(message) {
+            const messageElement = document.createElement('p');
+            messageElement.style.color = 'blue'; // 系统消息显示为蓝色
+            messageElement.innerHTML = message;
+            chatMessages.appendChild(messageElement);
+        }
+
+        // 滚动到消息框的底部
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // 辅助函数：格式化日期时间
+        function formatDateTime(date) {
+            // 获取年、月、日
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0'); // 月份从0开始，需要加1，并确保两位数
+            const day = String(date.getDate()).padStart(2, '0'); // 确保两位数
+
+            // 获取时、分、秒
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+
+            // 组合成所需的格式 YYYY-MM-DD HH:MM:SS
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+    </script>
+</body>
+</html>

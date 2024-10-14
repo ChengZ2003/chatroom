@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加入聊天室</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f5f5f5;
+            margin: 0;
+        }
+        #login-container {
+            width: 400px;
+            padding: 20px;
+            background-color: white;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h2 {
+            margin-bottom: 20px;
+        }
+        input[type="text"], select {
+            width: calc(100% - 24px);
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            width: calc(100% - 24px);
+            padding: 10px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+
+<div id="login-container">
+    <h2>加入聊天室</h2>
+    <form id="login-form">
+        <div>
+            <label for="username">用户名:</label><br>
+            <input type="text" id="username" placeholder="输入用户名" required>
+        </div>
+        <div>
+            <label for="room">房间:</label><br>
+            <select id="room">
+                <option value="JavaScript">JavaScript</option>
+                <option value="HTML">HTML</option>
+                <option value="CSS">CSS</option>
+                <option value="Web前端">Web前端</option>
+                <option value="Node.js">Node.js</option>
+            </select>
+        </div>
+        <button type="submit">加入聊天室</button>
+    </form>
+</div>
+
+<script>
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const username = document.getElementById('username').value;
+        const room = document.getElementById('room').value;
+
+        if (username) {
+            window.location.href = `chatroom.html?username=${encodeURIComponent(username)}&room=${encodeURIComponent(room)}`;
+        } else {
+            alert('请输入用户名');
+        }
+    });
+</script>
+
+</body>
+</html>
